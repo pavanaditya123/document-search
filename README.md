@@ -51,7 +51,7 @@ graph TD
 │   └── main.py          # FastAPI entrypoint — guardrails gate + /query endpoint
 ├── evals/               # RAGAS evaluation suite + Streamlit 3-tab demo
 ├── ui/                  # Streamlit chat interface with reasoning step transparency
-├── processed_data/      # Auto-generated — parsed & chunked JSON output per document
+├── processed_data/      # Created by ingestion (git-ignored): parsed & chunked JSON per document
 ├── docs/                # Architectural and operational guides (11 docs)
 ├── DATA/                # Sample datasets (True vs Noisy documentation)
 └── requirements.txt     # Pinned dependencies

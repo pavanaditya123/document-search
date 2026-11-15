@@ -32,7 +32,8 @@ index.faiss
 metadata.pkl
 
 # Data
-
+# Written by the ingestion run; regenerate with app/ingestion/processor.py
+processed_data/
 
 # IDEs
 .vscode/
