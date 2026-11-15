@@ -45,6 +45,7 @@ portkey-ai==2.3.0
 # --- OBSERVABILITY ---
 langsmith==0.8.3
 logfire[fastapi,requests]==4.32.1
+prometheus-client==0.21.1
 loguru==0.7.3
 
 # --- INGESTION PARSERS ---

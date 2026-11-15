@@ -10,9 +10,13 @@ load_dotenv()
 logfire.configure(token=os.getenv("LOGFIRE_TOKEN"))
 
 # Now safe to import app modules - logfire is already active
+import time
+
 from fastapi import FastAPI, Response
+from prometheus_client import make_asgi_app
 from app.agents.graph import rag_agent
 from app.guardrails import initialize_rails, guard
+from app import monitoring
 
 from pydantic import BaseModel
 from typing import Optional
@@ -20,6 +24,9 @@ from typing import Optional
 
 # Initialize FastAPI
 app = FastAPI(title="Enterprise Agentic RAG API")
+
+# Prometheus scrapes this. See app/monitoring.py and ops/alerts.yml.
+app.mount("/metrics", make_asgi_app())
 
 
 @app.on_event("startup")
@@ -34,6 +41,11 @@ class QueryRequest(BaseModel):
 @app.get("/")
 def home():
     return {"message": "Enterprise LangGraph RAG API is live."}
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
 
 
 @app.get("/graph")
@@ -53,6 +65,13 @@ def query(request: QueryRequest):
     """
     Executes the LangGraph RAG flow with memory using a POST request.
     """
+    started = time.perf_counter()
+    response = run_query(request)
+    monitoring.record(response, time.perf_counter() - started)
+    return response
+
+
+def run_query(request: QueryRequest) -> dict:
     q = request.q
     thread_id = request.thread_id
 

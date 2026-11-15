@@ -41,6 +41,7 @@ pdfplumber                  # Fallback PDF parser for scanned/complex layouts
 langsmith                   # Specialized tracing for LangChain/LangGraph
 logfire[fastapi,requests]   # Pydantic Logfire — FastAPI + requests instrumentation
 loguru                      # Enhanced logging for Python
+prometheus-client           # /metrics endpoint for Prometheus (see app/monitoring.py)
 
 # --- GUARDRAILS ---
 nemoguardrails              # NVIDIA NeMo Guardrails for input/output safety rails

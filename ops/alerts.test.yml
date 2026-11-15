@@ -1,0 +1,51 @@
+rule_files:
+  - alerts.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: 10% failing queries raises RagErrorRateHigh
+    interval: 1m
+    input_series:
+      - series: 'rag_queries_total{outcome="answered"}'
+        values: '0+9x30'
+      - series: 'rag_queries_total{outcome="error"}'
+        values: '0+1x30'
+    alert_rule_test:
+      - eval_time: 25m
+        alertname: RagErrorRateHigh
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: '10% of RAG queries are failing'
+              runbook: 'Check Groq/Portkey status and the fallback key, then Qdrant. Logfire has the stack trace.'
+
+  - name: an occasional failure stays quiet
+    interval: 1m
+    input_series:
+      - series: 'rag_queries_total{outcome="answered"}'
+        values: '0+50x30'
+      - series: 'rag_queries_total{outcome="error"}'
+        values: '0+1x30'
+    alert_rule_test:
+      - eval_time: 25m
+        alertname: RagErrorRateHigh
+        exp_alerts: []
+
+  - name: a third of technical answers with no context raises RagAnswersWithoutContext
+    interval: 1m
+    input_series:
+      - series: 'rag_queries_total{outcome="answered"}'
+        values: '0+2x90'
+      - series: 'rag_queries_total{outcome="no_context"}'
+        values: '0+1x90'
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: RagAnswersWithoutContext
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: '33.33% of technical answers had no retrieved context'
+              runbook: 'Is the Qdrant collection empty or was it re-created? Re-run ingestion and the eval suite.'

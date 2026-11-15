@@ -1,0 +1,57 @@
+# Alert rules for the RAG API (/metrics, see app/monitoring.py).
+#   promtool check rules ops/alerts.yml
+#   promtool test rules ops/alerts.test.yml
+
+groups:
+  - name: rag-api
+    rules:
+      - alert: RagErrorRateHigh
+        # The LLM provider, Qdrant or the gateway fallback is failing.
+        expr: |
+          sum(rate(rag_queries_total{outcome="error"}[10m]))
+            /
+          sum(rate(rag_queries_total[10m]))
+            > 0.05
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: '{{ $value | humanizePercentage }} of RAG queries are failing'
+          runbook: 'Check Groq/Portkey status and the fallback key, then Qdrant. Logfire has the stack trace.'
+
+      - alert: RagAnswersWithoutContext
+        # Technical questions answered with nothing retrieved: likely hallucinations.
+        expr: |
+          sum(rate(rag_queries_total{outcome="no_context"}[30m]))
+            /
+          sum(rate(rag_queries_total{outcome=~"answered|no_context"}[30m]))
+            > 0.2
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: '{{ $value | humanizePercentage }} of technical answers had no retrieved context'
+          runbook: 'Is the Qdrant collection empty or was it re-created? Re-run ingestion and the eval suite.'
+
+      - alert: RagLatencyHigh
+        expr: histogram_quantile(0.95, sum by (le) (rate(rag_query_duration_seconds_bucket[10m]))) > 30
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'RAG p95 latency is {{ $value }}s'
+          runbook: 'Usually Groq rate limiting (429s in Logfire). Check whether the fallback key is being used.'
+
+      - alert: GuardrailBlocksSpike
+        # A sudden jump in blocked prompts is often someone probing for jailbreaks.
+        expr: |
+          sum(rate(rag_queries_total{outcome="blocked"}[15m]))
+            >
+          3 * sum(rate(rag_queries_total{outcome="blocked"}[6h] offset 15m))
+          and
+          sum(increase(rag_queries_total{outcome="blocked"}[15m])) > 10
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Guardrail blocks are 3x their usual rate'
+          runbook: 'Read the blocked prompts in Logfire. Repeated jailbreak attempts from one thread_id should be rate limited.'
