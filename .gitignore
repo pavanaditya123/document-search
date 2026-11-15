@@ -56,3 +56,5 @@ tenvv
 
 # Logs
 *.log
+# Eval run outputs (CI keeps them as build artifacts; baseline.json is committed)
+evals/reports/
