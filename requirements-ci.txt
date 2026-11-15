@@ -1,0 +1,6 @@
+# Just enough to run the unit tests in CI, without torch, RAGAS or NeMo.
+pytest
+pandas
+requests
+logfire
+prometheus-client==0.21.1

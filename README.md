@@ -12,6 +12,8 @@ A production-grade, enterprise-level RAG system built with **LangGraph**, **Port
 - **Local Document Parsing**: PDF, HTML, TXT, DOCX, PPTX parsed entirely on-device — no external OCR service.
 - **Observability**: Full trace nesting with **Pydantic Logfire** and **LangSmith** across every agent node.
 - **Evaluation Suite**: RAGAS-powered eval pipeline (6 metrics) with a dedicated Streamlit demo app.
+- **Quality Gate**: a weekly CI job re-scores the golden set and fails if any metric falls below its floor or drops more than 0.05 from the last accepted run.
+- **Production Monitoring**: `/metrics` for Prometheus, with alerts for error rate, latency, guardrail spikes and answers given without retrieved context.
 
 ---
 
@@ -49,7 +51,9 @@ graph TD
 │   │   └── retrieval/   # Gemini embeddings + Qdrant search + FlashRank reranking
 │   ├── config.py        # Centralized environment variable management
 │   └── main.py          # FastAPI entrypoint — guardrails gate + /query endpoint
-├── evals/               # RAGAS evaluation suite + Streamlit 3-tab demo
+├── evals/               # RAGAS eval suite, Streamlit demo, quality gate (gate.py, run.py)
+├── ops/                 # Prometheus alert rules + their unit tests
+├── tests/               # pytest: monitoring, quality gate, chunking
 ├── ui/                  # Streamlit chat interface with reasoning step transparency
 ├── processed_data/      # Created by ingestion (git-ignored): parsed & chunked JSON per document
 ├── docs/                # Architectural and operational guides (11 docs)
@@ -144,8 +148,37 @@ streamlit run ui/app.py
 
 ```powershell
 # Requires the FastAPI backend running on :8000
-streamlit run evals/app.py
+streamlit run evals/app.py          # interactive, 3-tab demo
+python -m evals.run                 # headless: score, save a report, apply the quality gate
+python -m evals.run --update-baseline   # accept a passing run as the new baseline
 ```
+
+---
+
+## Running it in production
+
+**Is it still answering well?** `evals/gate.py` compares each run with two
+things: a floor per metric (`evals/thresholds.json`) and the last accepted
+run (`evals/baseline.json`). Failing either one fails the run. The second
+check exists because a change can drop faithfulness from 0.95 to 0.88 and
+still clear a 0.85 floor. `.github/workflows/evals.yml` runs this every
+Monday and on demand, and keeps the report as a build artifact.
+
+**Is it healthy right now?** `app/monitoring.py` sorts every `/query` into
+`answered`, `blocked` (guardrails), `no_context` or `error` and exposes
+counts and latency on `/metrics`. `no_context` is a technical question that
+got an answer with nothing retrieved, which is the usual shape of a
+hallucination. `ops/alerts.yml` alerts on:
+
+| Alert | Fires when |
+|---|---|
+| RagErrorRateHigh | over 5% of queries error for 10 min |
+| RagAnswersWithoutContext | over 20% of technical answers had no context for 30 min |
+| RagLatencyHigh | p95 above 30 s for 15 min |
+| GuardrailBlocksSpike | blocked prompts at 3x the usual rate |
+
+Each rule has unit tests: `promtool test rules ops/alerts.test.yml`.
+Code tests: `pip install -r requirements-ci.txt && pytest tests`.
 
 ---
 

@@ -1,0 +1,48 @@
+# Scores the live system against the golden dataset and fails if quality
+# dropped. Runs weekly and on demand. It calls real LLM APIs, so it needs
+# these repository secrets: GROQ_API_KEY, GROQ_FALLBACK_API_KEY, JUDGE_GROQ,
+# PORTKEY_API_KEY, GEMINI_API_KEY, QDRANT_API_KEY, QDRANT_CLUSTER_ENDPOINT.
+
+name: Evals
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '30 3 * * 1'   # Mondays 09:00 IST
+
+jobs:
+  evals:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90   # RAGAS waits between calls to respect Groq rate limits
+    env:
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      GROQ_FALLBACK_API_KEY: ${{ secrets.GROQ_FALLBACK_API_KEY }}
+      JUDGE_GROQ: ${{ secrets.JUDGE_GROQ }}
+      PORTKEY_API_KEY: ${{ secrets.PORTKEY_API_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
+      QDRANT_CLUSTER_ENDPOINT: ${{ secrets.QDRANT_CLUSTER_ENDPOINT }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      - name: Start the API
+        run: |
+          uvicorn app.main:app --port 8000 > api.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf localhost:8000/health && exit 0; sleep 5; done
+          cat api.log; exit 1
+
+      - name: Run evals and apply the quality gate
+        run: python -m evals.run
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eval-report
+          path: |
+            evals/reports/
+            api.log
