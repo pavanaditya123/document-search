@@ -46,6 +46,14 @@ portkey-ai==2.3.0
 langsmith==0.8.3
 logfire[fastapi,requests]==4.32.1
 prometheus-client==0.21.1
+# Pinned so pip does not give up while backtracking through the
+# OpenTelemetry packages logfire pulls in (ResolutionImpossible in Docker).
+opentelemetry-api==1.40.0
+opentelemetry-sdk==1.40.0
+opentelemetry-instrumentation==0.61b0
+opentelemetry-instrumentation-asgi==0.61b0
+opentelemetry-instrumentation-fastapi==0.61b0
+opentelemetry-instrumentation-requests==0.61b0
 loguru==0.7.3
 
 # --- INGESTION PARSERS ---
