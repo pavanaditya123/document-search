@@ -45,6 +45,9 @@ jobs:
         run: |
           docker run -d --name api -p 8000:8000 \
             -e GROQ_API_KEY=placeholder -e GROQ_FALLBACK_API_KEY=placeholder \
+            -e JUDGE_GROQ=placeholder -e PORTKEY_API_KEY=placeholder \
+            -e GEMINI_API_KEY=placeholder -e QDRANT_API_KEY=placeholder \
+            -e QDRANT_CLUSTER_ENDPOINT=http://localhost:6333 \
             -e LANGSMITH_TRACING=false \
             document-search:ci uvicorn app.main:app --host 0.0.0.0 --port 8000
           for i in $(seq 1 60); do
