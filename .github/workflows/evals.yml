@@ -2,6 +2,11 @@
 # dropped. Runs weekly and on demand. It calls real LLM APIs, so it needs
 # these repository secrets: GROQ_API_KEY, GROQ_FALLBACK_API_KEY, JUDGE_GROQ,
 # PORTKEY_API_KEY, GEMINI_API_KEY, QDRANT_API_KEY, QDRANT_CLUSTER_ENDPOINT.
+# Optional: LOGFIRE_TOKEN and LANGSMITH_API_KEY for tracing.
+#
+# If a required secret is missing the job does not fail: it skips the run
+# and says which secrets to add in the job summary. A missing key is a setup
+# problem, not a quality regression, and should not look like one.
 
 name: Evals
 
@@ -22,25 +27,54 @@ jobs:
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
       QDRANT_CLUSTER_ENDPOINT: ${{ secrets.QDRANT_CLUSTER_ENDPOINT }}
+      LOGFIRE_TOKEN: ${{ secrets.LOGFIRE_TOKEN }}
+      LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
+      # Only trace to LangSmith when a key is there, otherwise it just logs errors.
+      LANGSMITH_TRACING: ${{ secrets.LANGSMITH_API_KEY != '' && 'true' || 'false' }}
     steps:
+      - name: Check the required secrets are set
+        id: secrets
+        run: |
+          missing=""
+          for name in GROQ_API_KEY GROQ_FALLBACK_API_KEY JUDGE_GROQ PORTKEY_API_KEY \
+                      GEMINI_API_KEY QDRANT_API_KEY QDRANT_CLUSTER_ENDPOINT; do
+            if [ -z "${!name}" ]; then missing="$missing $name"; fi
+          done
+          if [ -n "$missing" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Evals skipped, missing secrets:$missing"
+            {
+              echo "## Evals skipped"
+              echo "Add these repository secrets (Settings > Secrets and variables > Actions):"
+              for name in $missing; do echo "- \`$name\`"; done
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/checkout@v5
+        if: steps.secrets.outputs.ready == 'true'
       - uses: actions/setup-python@v5
+        if: steps.secrets.outputs.ready == 'true'
         with:
           python-version: '3.11'
           cache: pip
       - run: pip install -r requirements.txt
+        if: steps.secrets.outputs.ready == 'true'
 
       - name: Start the API
+        if: steps.secrets.outputs.ready == 'true'
         run: |
           uvicorn app.main:app --port 8000 > api.log 2>&1 &
           for i in $(seq 1 60); do curl -sf localhost:8000/health && exit 0; sleep 5; done
           cat api.log; exit 1
 
       - name: Run evals and apply the quality gate
+        if: steps.secrets.outputs.ready == 'true'
         run: python -m evals.run
 
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && steps.secrets.outputs.ready == 'true'
         with:
           name: eval-report
           path: |
