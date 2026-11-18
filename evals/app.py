@@ -10,7 +10,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import logfire
-logfire.configure(token=os.getenv("LOGFIRE_TOKEN"), service_name="evals")
+from app.telemetry import configure_logfire
+
+configure_logfire(service_name="evals")
 
 # ─────────────────────────────────────────────────────────────────────────────
 import asyncio

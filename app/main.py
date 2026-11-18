@@ -2,15 +2,18 @@
 # CRITICAL: logfire MUST be configured before ALL other imports
 # so that spans from all modules are captured from the start.
 # ============================================================
-import logfire
-import os
 from dotenv import load_dotenv
 
 load_dotenv()
-logfire.configure(token=os.getenv("LOGFIRE_TOKEN"))
+
+from app.telemetry import configure_logfire  # noqa: E402
+
+configure_logfire()
 
 # Now safe to import app modules - logfire is already active
 import time
+
+import logfire
 
 from fastapi import FastAPI, Response
 from prometheus_client import make_asgi_app
