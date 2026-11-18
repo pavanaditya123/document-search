@@ -31,6 +31,7 @@ langchain==1.2.18
 langgraph==1.1.10
 langchain-google-vertexai==3.2.3
 langchain-groq==1.1.2
+langchain-google-genai==4.3.7     # Gemini embeddings (app/services/retrieval/embedding.py)
 langchain-community==0.4.1
 langchain-openai==1.2.1
 pydantic==2.13.4
